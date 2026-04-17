@@ -1,0 +1,58 @@
+import streamlit as st
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
+import av
+import cv2
+import numpy as np
+from detector import DrowsinessDetector
+
+# RTC Configuration for STUN servers (needed for peer-to-peer connection in some networks)
+RTC_CONFIGURATION = RTCConfiguration(
+    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+)
+
+class VideoProcessor(VideoProcessorBase):
+    def __init__(self):
+        self.detector = DrowsinessDetector()
+
+    def recv(self, frame):
+        img = frame.to_ndarray(format="bgr24")
+        
+        # Process the image using our existing detector
+        # Note: detector.process_frame expects a BGR image and returns a BGR image
+        processed_img = self.detector.process_frame(img)
+        
+        return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
+
+    def on_ended(self):
+        self.detector.release()
+
+def main():
+    st.set_page_config(page_title="Web Sleep Detection", page_icon="😴")
+    st.title("Remote Sleep Detection System")
+    st.markdown("""
+    This app uses **WebRTC** to process your camera feed in the browser.
+    It detects:
+    - **EAR** (Eye Aspect Ratio) for sleep/drowsiness
+    - **MAR** (Mouth Aspect Ratio) for yawning
+    - **Blinks** tracking
+    """)
+
+    webrtc_ctx = webrtc_streamer(
+        key="sleep-detection",
+        rtc_configuration=RTC_CONFIGURATION,
+        video_processor_factory=VideoProcessor,
+        async_processing=True,
+    )
+
+    st.sidebar.markdown("### System Log")
+    if st.button("Clear Log File"):
+        if 'detector' in st.session_state:
+            # This is tricky with webrtc threads, but we can clear the file
+            with open("drowsiness_log.txt", "w") as f:
+                f.write("=== Drowsiness Detection Log ===\n")
+            st.sidebar.success("Log cleared!")
+
+    st.sidebar.info("The system logs events to `drowsiness_log.txt` on the server.")
+
+if __name__ == "__main__":
+    main()
