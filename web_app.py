@@ -49,7 +49,11 @@ def main():
         key="sleep-detection",
         rtc_configuration=RTC_CONFIGURATION,
         video_processor_factory=VideoProcessor,
-        async_processing=True,
+        async_processing=False,  # Changed to False for stability on Streamlit Cloud
+        media_stream_constraints={
+            "video": {"width": {"ideal": 320}, "height": {"ideal": 240}},
+            "audio": False
+        },
     )
 
     st.sidebar.markdown("### System Log")
