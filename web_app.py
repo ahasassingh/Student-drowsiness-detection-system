@@ -21,15 +21,21 @@ RTC_CONFIGURATION = RTCConfiguration(
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.detector = DrowsinessDetector()
+        self.frame_count = 0
 
     def recv(self, frame):
+        self.frame_count += 1
         img = frame.to_ndarray(format="bgr24")
         
-        # Process the image using our existing detector
-        # Note: detector.process_frame expects a BGR image and returns a BGR image
-        processed_img = self.detector.process_frame(img)
+        # Only process every 2nd frame to save CPU on Streamlit Cloud
+        if self.frame_count % 2 == 0:
+            # Note: detector.process_frame expects a BGR image and returns a BGR image
+            processed_img = self.detector.process_frame(img)
+            return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
         
-        return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
+        # For skipped frames, just return the original BGR translation
+        # This keeps the video smooth while saving CPU cycles
+        return av.VideoFrame.from_ndarray(img, format="bgr24")
 
     def on_ended(self):
         self.detector.release()
